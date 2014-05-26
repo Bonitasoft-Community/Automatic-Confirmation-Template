@@ -1,52 +1,196 @@
+<!-- Original code by Philippe OZIL at Bonitasoft, GPL v2. -->
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html dir="ltr" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" lang="en">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<meta name="description" content="Bonita Forms Application" />
-<link href="css/bonita_form_default.css" rel="stylesheet" type="text/css" />
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta name="description" content="Bonita Forms Application" />
+	<link href="css/bonita_form_default.css" rel="stylesheet" type="text/css" />
+	<style type="text/css">
+	a,a:hover	{color:#B20706;}
+	
+	#bonita_form_confirm_todolist {display:none;}
+	
+	#backToInbox {text-align:center;}
+	#backToInbox a {padding-bottom:20px; display:block;}
+	
+	#autoRedirectContainer {width:600px; margin:auto;}
+	
+	#loadingContainer .label {margin-top:10px; text-align:center;}
+	#loadingContainer .barContainer {width:260px; clear:both; margin:10px auto 40px auto;}
+	#loadingContainer span {display:inline-block; height:15px;}
+	#loadingContainer .bar {width:200px; float:left; border:1px solid #000000; border-radius:6px;}
+	#loadingCounterValue {width:50px; float:right; text-align:right;}
+	#loadingBarFill {width:0; border-radius:3px;
+		background: transparent no-repeat 20px center,-webkit-linear-gradient(top, #f20a08 0%, #b20706 100%) center center !important;
+		background: no-repeat 20px center,-webkit-linear-gradient(top, #f20a08 0%, #b20706 100%) !important;
+		background: transparent no-repeat 20px center,-moz-linear-gradient(top, #f20a08 0%, #b20706 100%) center center !important;
+		background: no-repeat 20px center,-moz-linear-gradient(top, #f20a08 0%, #b20706 100%) !important;
+		background: transparent no-repeat 20px center, -ms-linear-gradient(top, #f20a08 0%, #b20706 100%) center center !important;
+		background: no-repeat 20px center, -ms-linear-gradient(top, #f20a08 0%, #b20706 100%) !important;
+		background: transparent no-repeat 20px center, linear-gradient(to bottom, #f20a08 0%, #b20706 100%) center center !important;
+	}
+	
+	#availableTaskContainer h2 {margin-top:20px;}
+	#availableTaskContainer ul {margin:10px 0 0 40px;}
+	
+	.noTaskAvailable	{font-size:16px; text-align:center; margin-top:20px;}
+	
+	h2.redirecting	{text-align:center; margin-top:100px;}
+	</style>
 </head>
 <body>
 	<div class="bonita_form_container">
 		<div id="bonita_form_confirm_message" class="bonita_form_confirm_message"></div>
+		<div id="backToInbox"></div>
 		<div id="bonita_form_confirm_todolist" class="bonita_form_confirm_todolist"></div>
 		
+		<div id="autoRedirectContainer">
+		
+			<h2 id="tasksFromCaseLabel"></h2>
+			<div id="loadingContainer">
+				<div class="label"></div>
+				<div class="barContainer">
+					<span class="bar"><span id="loadingBarFill"></span></span>
+					<span id="loadingCounterValue"></span>
+				</div>
+			</div>
+			
+			<div id="availableTaskContainer"></div>
+		
+		</div>
+		
 		<script type="text/javascript">
-		//Original code by Philippe OZIL at Bonitasoft, GPL v2.
-		// Settings for checking for a next available task
-		var nextTaskCheckRetries = 20;
-		var nextTaskCheckDelay = 200;
+		// Settings
+		var SETTINGS = {
+			showBackToInbox : true,
+			showTasksFromOtherAppsDelay : 3,	// delay in seconds before displaying tasks from other Apps, -1 for never
+			i18n : {
+				en : {
+					tasksFromCase : 'Available tasks from this Case',
+					tasksFromOtherCases : 'Available tasks from other Cases',
+					searchingNextTask : 'Searching for next task...',
+					noTaskAvailable : 'No task available',
+					backToInbox : 'Back to inbox',
+					redirecting : 'Redirecting...'
+				},
+				fr : {
+					tasksFromCase : 'Tâches disponible du Cas',
+					tasksFromOtherCases : 'Tâches disponible d\'autres Cas',
+					searchingNextTask : 'Recherche de la tâche suivante...',
+					noTaskAvailable : 'Pas de tâche disponible',
+					backToInbox : 'Retour à la boite de réception',
+					redirecting : 'Redirection...'
+				}
+			}
+		};
+		
+		//Page global data
+		var curUserLocale = null;
+		var nextTaskCheckRetry = -1;
+		var counterBar = $('#loadingBarFill');
+		var counterValue = $('#loadingCounterValue');
 		
 		// Checks for a next available task and redirect to it
 		function checkForNextTask()
 		{
-			var linkElement = getLinkElement();
-			if (linkElement == null)
+			var linkElement = $('#bonita_form_confirm_todolist .bonita_form_task_link');
+			if (linkElement.length == 0)
 			{
-				nextTaskCheckRetries --;
-				if (nextTaskCheckRetries > 0)
-					setTimeout(checkForNextTask, nextTaskCheckDelay);
+				nextTaskCheckRetry ++;
+				counterBar.css('width', nextTaskCheckRetry*2);
+				counterValue.html(nextTaskCheckRetry +'%');
+				if (nextTaskCheckRetry < 100)
+					setTimeout(checkForNextTask, 100);
+				else // Give up
+					$('#loadingContainer').html('<div class="noTaskAvailable">'+ getI18N('noTaskAvailable') +'</div>');
 			}
 			else // Move to next task
 				linkElement.click();
 		}
-		
-		// Retrieves next task link if available
-		function getLinkElement()
+		function dispAvailableTaskFromOtherApps()
 		{
-			var linkElement = null;
-			var rootElement = document.getElementById('bonita_form_confirm_todolist');
-			if (rootElement.childNodes.length > 0)
-			{
-				rootElement = rootElement.childNodes[0];
-				if (rootElement.childNodes.length > 1)
-					linkElement = rootElement.childNodes[1];
-			}
-			return linkElement;
+			// Get current user id
+			var userId = 0;
+			// Call REST API to fetch available tasks
+			$.ajax({
+				url : '/bonita/API/bpm/humanTask?p=0&c=10&f=state%3dready&f=user_id%3d'+ userId,
+				type : 'GET',
+				cache : false,
+				dataType : 'json'
+			}).done(function (taskList) {
+				var content = '<h2>'+ getI18N('tasksFromOtherCases') +'</h2>';
+				if (taskList.length == 0)
+					content += '<div class="noTaskAvailable">'+ getI18N('noTaskAvailable') +'</div>';
+				else
+				{
+					content += '<ul>';
+					for (var i=0; i<taskList.length; i++)
+						content += '<li><a href="javascript:void(0);" taskId="'+ taskList[i].id 
+							+'" taskName="'+ taskList[i].name 
+							+'" processId="'+ taskList[i].processId +'">'
+							+ taskList[i].displayName +'</a></li>';
+					content += '</ul>';
+				}
+				
+				$('#availableTaskContainer').html(content);
+				$('#availableTaskContainer a').click(function () {
+					redirectToTaskForm($(this).attr('taskId'), $(this).attr('taskName'), $(this).attr('processId'));
+				});
+			});
 		}
-		// First run
-		checkForNextTask();
-		</script>
+		function redirectToTaskForm(taskId, taskName, processId)
+		{
+			// Update UI
+			$('#bonita_form_confirm_message').remove();
+			$('#autoRedirectContainer').html('<h2 class="redirecting">'+ getI18N('redirecting') +'</h2>');
+			// Call REST API to fetch process
+			$.ajax({
+				url : '/bonita/API/bpm/process/'+ processId,
+				type : 'GET',
+				cache : false,
+				dataType : 'json'
+			}).done(function (process) {
+				// Get task URL and redirect
+				var taskFormName = process.name + "--" + process.version + "--" + taskName;
+				var mode = (window.location.href.indexOf('mode=app') == -1) ? 'form' : 'app';
+				var taskUrl = '/bonita/portal/homepage?ui=form#form='+ taskFormName
+					+'$entry&mode='+ mode +'&task='+ taskId;
+				window.location = taskUrl;
+			});
+		}
+		function getI18N(key)
+		{
+			if (curUserLocale == null)
+			{
+				// Get current user locale if not already set
+				var cookies = document.cookie;
+				var localeIndex = cookies.lastIndexOf('BOS_Locale=')
+				if (localeIndex != -1)
+				{
+					var value = cookies.substring(localeIndex);
+					var parts = value.split("=");
+					if (parts.length == 2)
+						curUserLocale = parts[1];
+				}
+				// Set default locale if not found
+				if (curUserLocale == null)
+					curUserLocale = 'en';
+			}
+			// Return translated key
+			return SETTINGS.i18n[curUserLocale][key];
+		}
 		
+		// Load initial labels at startup
+		$('#tasksFromCaseLabel').text(getI18N('tasksFromCase'));
+		$('#loadingContainer .label').text(getI18N('searchingNextTask'));
+		if (SETTINGS.showBackToInbox)
+			$('#backToInbox').html('<a href="/bonita/portal/homepage" target="_parent">'+ getI18N('backToInbox') +'</a>');
+		// Start checking for next task
+		checkForNextTask();
+		// Display tasks for other apps
+		if (SETTINGS.showTasksFromOtherAppsDelay >= 0)
+			setTimeout(dispAvailableTaskFromOtherApps, SETTINGS.showTasksFromOtherAppsDelay * 1000);
+		</script>
 	</div>
 </body>
 </html>

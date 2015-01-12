@@ -9,7 +9,7 @@ Features:
 - automatic redirection to next task of same case with progress bar
 - configurable display of links to other tasks from other cases
 - optional link to go back to inbox
-- support for i18n
+- support for i18n: EN, FR, ES
 
 
 Content:
